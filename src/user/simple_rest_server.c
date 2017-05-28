@@ -3,26 +3,16 @@
 void http_recv_simple_rest_server(void *arg, char *pdata, unsigned short len) {
 	os_printf("%s\n\r", pdata);
 
-	char data[256] = "<html>\
-<head>\
-	<title>ESP8266</title>\
-</head>\
-<body>\
-	<script>\
-		setTimeout(function(){\
-			location.reload();\
-		}, 10000);\
-	</script>\
-</body>\
-</html>\0";
+	char data[256] = "{adc0threshold:1,adc0value:2}\0";
 	char header[512];
 	os_sprintf(header, "HTTP/1.1 200 OK\r\n\
-Content-type: text/html\r\n\
+Access-Control-Allow-Origin: *\r\n\
+Content-type: application/json\r\n\
 Content-length: %d\r\n\
 \r\n%s\0", strlen(data), data);
 
   //returns 0 on success
-	if (espconn_sent((struct espconn *) arg, data, strlen(data)) != ESPCONN_OK) {
+	if (espconn_sent((struct espconn *) arg, header, strlen(header)) != ESPCONN_OK) {
 		os_printf("Response failed\n\r");
 	} else {
 		os_printf("Response sent\n\r");
