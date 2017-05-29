@@ -1766,9 +1766,7 @@ void webserver_discon(void *arg)
  * Parameters   : arg -- Additional argument to pass to the callback function
  * Returns      : none
 *******************************************************************************/
-LOCAL void ICACHE_FLASH_ATTR
-webserver_listen(void *arg)
-{
+LOCAL void ICACHE_FLASH_ATTR webserver_listen(void *arg) {
     struct espconn *pesp_conn = arg;
 
     espconn_regist_recvcb(pesp_conn, webserver_recv);
