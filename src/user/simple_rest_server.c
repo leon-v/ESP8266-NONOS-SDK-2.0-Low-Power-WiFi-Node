@@ -18,27 +18,35 @@ LOCAL bool ICACHE_FLASH_ATTR check_data(char *precv, uint16 length){
 
 	ptemp = (char *)os_strstr(precv, "\r\n\r\n");
 
-	if (ptemp != NULL) {
-		tmp_length -= ptemp - precv;
-		tmp_length -= 4;
-		tmp_totallength += tmp_length;
+	if (ptemp == NULL) {
+		return true;
+	}
 
-		pdata = (char *)os_strstr(precv, "Content-Length: ");
 
-		if (pdata != NULL){
-			pdata += 16;
-			tmp_precvbuffer = (char *)os_strstr(pdata, "\r\n");
+	tmp_length -= ptemp - precv;
+	tmp_length -= 4;
+	tmp_totallength += tmp_length;
 
-			if (tmp_precvbuffer != NULL){
-				os_memcpy(length_buf, pdata, tmp_precvbuffer - pdata);
-				dat_sumlength = atoi(length_buf);
-				os_printf("A_dat:%u,tot:%u,lenght:%u\n",dat_sumlength,tmp_totallength,tmp_length);
-				if(dat_sumlength != tmp_totallength){
-					return false;
-				}
-			}
+	pdata = (char *)os_strstr(precv, "Content-Length: ");
+
+	if (pdata == NULL){
+		return true;
+	}
+
+	pdata += 16;
+
+	tmp_precvbuffer = (char *)os_strstr(pdata, "\r\n");
+
+	if (tmp_precvbuffer != NULL){
+
+		os_memcpy(length_buf, pdata, tmp_precvbuffer - pdata);
+		dat_sumlength = atoi(length_buf);
+		os_printf("A_dat:%u,tot:%u,lenght:%u\n",dat_sumlength,tmp_totallength,tmp_length);
+		if(dat_sumlength != tmp_totallength){
+			return false;
 		}
 	}
+
 	return true;
 }
 
@@ -244,16 +252,17 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 	os_printf("len:%u\n",length);
 
 	if(check_data(pusrdata, length) == false){
-		os_printf("goto\n");
+		os_printf("Skip Packet\n");
 		goto _temp_exit;
 	}
 
 	parse_flag = save_data(pusrdata, length);
+
 	if (parse_flag == false) {
 		response_send(ptrespconn, false);
 	}
 
-	os_printf(precvbuffer);
+	os_printf("BUFFER DATA:\n%s\n\n", precvbuffer);
 	pURL_Frame = (URL_Frame *)os_zalloc(sizeof(URL_Frame));
 	parse_url(precvbuffer, pURL_Frame);
 
@@ -261,6 +270,8 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 		case GET:
 
 			os_printf("We have a GET request.\n");
+
+			response_send(ptrespconn, true);
 			break;
 
 		case POST:
@@ -281,10 +292,20 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 
 			os_free(pURL_Frame);
 			pURL_Frame = NULL;
-			_temp_exit:
-			;
-		break;
+
+			response_send(ptrespconn, true);
+			break;
 	}
+
+	if (precvbuffer != NULL){
+		os_free(precvbuffer);
+		precvbuffer = NULL;
+	}
+
+	os_free(pURL_Frame);
+	pURL_Frame = NULL;
+	_temp_exit:
+		;
 }
 
 LOCAL ICACHE_FLASH_ATTR void webserver_recon(void *arg, sint8 err) {
