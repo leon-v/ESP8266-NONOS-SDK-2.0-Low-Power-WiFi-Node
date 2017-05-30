@@ -103,6 +103,133 @@ LOCAL bool ICACHE_FLASH_ATTR save_data(char *precv, uint16 length) {
 }
 
 
+LOCAL void ICACHE_FLASH_ATTR parse_url(char *precv, URL_Frame *purl_frame){
+	char *str = NULL;
+	uint8 length = 0;
+	char *pbuffer = NULL;
+	char *pbufer = NULL;
+
+	if (purl_frame == NULL || precv == NULL) {
+		return;
+	}
+
+	pbuffer = (char *)os_strstr(precv, "Host:");
+
+	if (pbuffer != NULL) {
+		length = pbuffer - precv;
+		pbufer = (char *)os_zalloc(length + 1);
+		pbuffer = pbufer;
+		os_memcpy(pbuffer, precv, length);
+		os_memset(purl_frame->pSelect, 0, URLSize);
+		os_memset(purl_frame->pCommand, 0, URLSize);
+		os_memset(purl_frame->pFilename, 0, URLSize);
+
+		if (os_strncmp(pbuffer, "GET ", 4) == 0) {
+			purl_frame->Type = GET;
+			pbuffer += 4;
+		} else if (os_strncmp(pbuffer, "POST ", 5) == 0) {
+			purl_frame->Type = POST;
+			pbuffer += 5;
+		}
+
+		pbuffer ++;
+		str = (char *)os_strstr(pbuffer, "?");
+
+		if (str != NULL) {
+			length = str - pbuffer;
+			os_memcpy(purl_frame->pSelect, pbuffer, length);
+			str ++;
+			pbuffer = (char *)os_strstr(str, "=");
+
+			if (pbuffer != NULL) {
+				length = pbuffer - str;
+				os_memcpy(purl_frame->pCommand, str, length);
+				pbuffer ++;
+				str = (char *)os_strstr(pbuffer, "&");
+
+				if (str != NULL) {
+					length = str - pbuffer;
+					os_memcpy(purl_frame->pFilename, pbuffer, length);
+				} else {
+					str = (char *)os_strstr(pbuffer, " HTTP");
+
+					if (str != NULL) {
+						length = str - pbuffer;
+						os_memcpy(purl_frame->pFilename, pbuffer, length);
+					}
+				}
+			}
+		}
+
+		os_free(pbufer);
+	} else {
+		return;
+	}
+}
+
+
+
+
+LOCAL void ICACHE_FLASH_ATTR data_send(void *arg, bool responseOK, char *psend) {
+	uint16 length = 0;
+	char *pbuf = NULL;
+	char httphead[256];
+	struct espconn *ptrespconn = arg;
+	os_memset(httphead, 0, 256);
+
+	if (responseOK) {
+		os_sprintf(httphead,
+			"HTTP/1.0 200 OK\r\nContent-Length: %d\r\nServer: lwIP/1.4.0\r\n",
+			psend ? os_strlen(psend) : 0);
+
+		if (psend) {
+			os_sprintf(httphead + os_strlen(httphead),
+				"Content-type: application/json\r\nExpires: Fri, 10 Apr 2008 14:00:00 GMT\r\nPragma: no-cache\r\n\r\n");
+			length = os_strlen(httphead) + os_strlen(psend);
+			pbuf = (char *)os_zalloc(length + 1);
+			os_memcpy(pbuf, httphead, os_strlen(httphead));
+			os_memcpy(pbuf + os_strlen(httphead), psend, os_strlen(psend));
+		} else {
+			os_sprintf(httphead + os_strlen(httphead), "\n");
+			length = os_strlen(httphead);
+		}
+	} else {
+		os_sprintf(httphead, "HTTP/1.0 400 BadRequest\r\n\
+			Content-Length: 0\r\nServer: lwIP/1.4.0\r\n\n");
+		length = os_strlen(httphead);
+	}
+
+	if (psend) {
+	#ifdef SERVER_SSL_ENABLE
+		espconn_secure_sent(ptrespconn, pbuf, length);
+	#else
+		espconn_sent(ptrespconn, pbuf, length);
+	#endif
+	} else {
+	#ifdef SERVER_SSL_ENABLE
+		espconn_secure_sent(ptrespconn, httphead, length);
+	#else
+		espconn_sent(ptrespconn, httphead, length);
+	#endif
+	}
+
+	if (pbuf) {
+		os_free(pbuf);
+		pbuf = NULL;
+	}
+}
+
+
+
+
+
+
+
+LOCAL void ICACHE_FLASH_ATTR response_send(void *arg, bool responseOK){
+	struct espconn *ptrespconn = arg;
+	data_send(ptrespconn, responseOK, NULL);
+}
+
 
 
 
@@ -155,6 +282,7 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 			os_free(pURL_Frame);
 			pURL_Frame = NULL;
 			_temp_exit:
+			;
 		break;
 	}
 }

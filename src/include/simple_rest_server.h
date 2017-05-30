@@ -1,9 +1,18 @@
 #ifndef __SIMPLE_REST_SERVER_H__
 #define __SIMPLE_REST_SERVER_H__
 
+#include "ets_sys.h"
+#include "os_type.h"
 #include "osapi.h"
+#include "mem.h"
 #include "user_interface.h"
+
 #include "espconn.h"
+
+#include "upgrade.h"
+
+//#include "ssl/cert.h"
+//#include "ssl/private_key.h"
 
 #define SERVER_PORT 80
 #define SERVER_SSL_PORT 443
