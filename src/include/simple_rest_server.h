@@ -5,6 +5,10 @@
 #include "os_type.h"
 #include "osapi.h"
 #include "mem.h"
+
+#include "json/jsonparse.h"
+#include "json/jsontree.h"
+
 #include "user_interface.h"
 
 #include "espconn.h"
@@ -18,6 +22,12 @@
 #define SERVER_SSL_PORT 443
 
 #define URLSize 10
+
+#define jsonSize   2*1024
+
+typedef enum _ParmType {
+    ADC = 0
+} ParmType;
 
 typedef enum ProtocolType {
     GET = 0,

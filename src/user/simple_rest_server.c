@@ -7,8 +7,214 @@ static uint32 dat_sumlength = 0;
 
 
 
-LOCAL bool ICACHE_FLASH_ATTR check_data(char *precv, uint16 length){
-	//bool flag = true;
+
+
+
+
+
+
+
+
+LOCAL char *json_buf;
+LOCAL int pos;
+LOCAL int size;
+int ICACHE_FLASH_ATTR json_putchar(int c) {
+    if (json_buf != NULL && pos <= size) {
+        json_buf[pos++] = c;
+        return c;
+    }
+
+    return 0;
+}
+void ICACHE_FLASH_ATTR json_parse(struct jsontree_context *json, char *ptrJSONMessage){
+    /* Set value */
+    struct jsontree_value *v;
+    struct jsontree_callback *c;
+    struct jsontree_callback *c_bak = NULL;
+
+    while ((v = jsontree_find_next(json, JSON_TYPE_CALLBACK)) != NULL) {
+        c = (struct jsontree_callback *)v;
+
+        if (c == c_bak) {
+            continue;
+        }
+
+        c_bak = c;
+
+        if (c->set != NULL) {
+            struct jsonparse_state js;
+
+            jsonparse_setup(&js, ptrJSONMessage, os_strlen(ptrJSONMessage));
+            c->set(json, &js);
+        }
+    }
+}
+
+struct jsontree_value *ICACHE_FLASH_ATTR find_json_path(struct jsontree_context *json, const char *path) {
+	struct jsontree_value *v;
+	const char *start;
+	const char *end;
+	int len;
+
+	v = json->values[0];
+	start = path;
+
+	do {
+		end = (const char *)os_strstr(start, "/");
+
+		if (end == start) {
+			break;
+		}
+
+		if (end != NULL) {
+			len = end - start;
+			end++;
+		} else {
+			len = os_strlen(start);
+		}
+
+		if (v->type != JSON_TYPE_OBJECT) {
+			v = NULL;
+		} else {
+			struct jsontree_object *o;
+			int i;
+
+			o = (struct jsontree_object *)v;
+			v = NULL;
+
+			for (i = 0; i < o->count; i++) {
+				if (os_strncmp(start, o->pairs[i].name, len) == 0) {
+					v = o->pairs[i].value;
+					json->index[json->depth] = i;
+					json->depth++;
+					json->values[json->depth] = v;
+					json->index[json->depth] = 0;
+					break;
+				}
+			}
+		}
+
+		start = end;
+	} while (end != NULL && *end != '\0' && v != NULL);
+
+	json->callback_state = 0;
+	return v;
+}
+void ICACHE_FLASH_ATTR json_ws_send(struct jsontree_value *tree, const char *path, char *pbuf) {
+	struct jsontree_context json;
+    /* maxsize = 128 bytes */
+	json_buf = (char *)os_malloc(jsonSize);
+
+    /* reset state and set max-size */
+    /* NOTE: packet will be truncated at 512 bytes */
+	pos = 0;
+	size = jsonSize;
+
+	json.values[0] = (struct jsontree_value *)tree;
+	jsontree_reset(&json);
+	find_json_path(&json, path);
+	json.path = json.depth;
+	json.putchar = json_putchar;
+
+	while (jsontree_print_next(&json) && json.path <= json.depth);
+
+	json_buf[pos] = 0;
+	os_memcpy(pbuf, json_buf, pos);
+	os_free(json_buf);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+LOCAL int ICACHE_FLASH_ATTR REST_Get(struct jsontree_context *js_ctx) {
+	char string[32];
+
+	const char *path = jsontree_path_name(js_ctx, js_ctx->depth - 1);
+
+	if (os_strncmp(path, "threashold", 10) == 0) {
+		os_sprintf(string, "%s", "get threashold\n");
+
+	}else if (os_strncmp(path, "min", 3) == 0) {
+		os_sprintf(string, "%s", "get min\n");
+
+	}else if (os_strncmp(path, "max", 3) == 0) {
+		os_sprintf(string, "%s", "get max\n");
+
+	}
+
+	jsontree_write_string(js_ctx, string);
+
+	return 0;
+}
+LOCAL int ICACHE_FLASH_ATTR REST_Set(struct jsontree_context *js_ctx, struct jsonparse_state *parser){
+	int type;
+
+	while ((type = jsonparse_next(parser)) != 0) {
+		if (type == JSON_TYPE_PAIR_NAME) {
+			if (jsonparse_strcmp_value(parser, "threashold") == 0) {
+				jsonparse_next(parser);
+				jsonparse_next(parser);
+				uint8 threashold;
+				threashold = jsonparse_get_value_as_int(parser);
+				os_printf("set threashold %d\n", threashold);
+
+			}else if (jsonparse_strcmp_value(parser, "min") == 0) {
+				jsonparse_next(parser);
+				jsonparse_next(parser);
+				uint8 min;
+				min = jsonparse_get_value_as_int(parser);
+				os_printf("set min %d\n", min);
+
+			}else if (jsonparse_strcmp_value(parser, "max") == 0) {
+				jsonparse_next(parser);
+				jsonparse_next(parser);
+				uint8 max;
+				max = jsonparse_get_value_as_int(parser);
+				os_printf("set max %d\n", max);
+			}
+		}
+	}
+
+	return 0;
+}
+
+LOCAL struct jsontree_callback REST_Callback = JSONTREE_CALLBACK(REST_Get, REST_Set);
+
+JSONTREE_OBJECT(ADCTree,
+	JSONTREE_PAIR("threashold", &REST_Callback),
+	JSONTREE_PAIR("min", &REST_Callback),
+	JSONTREE_PAIR("max", &REST_Callback),
+);
+JSONTREE_OBJECT(RESTTree,
+	JSONTREE_PAIR("get", &ADCTree),
+	JSONTREE_PAIR("set", &ADCTree)
+);
+
+
+
+
+
+
+
+
+
+
+
+
+LOCAL bool ICACHE_FLASH_ATTR check_data(char *precv, uint16 length) {
+        //bool flag = true;
 	char length_buf[10] = {0};
 	char *ptemp = NULL;
 	char *pdata = NULL;
@@ -18,35 +224,27 @@ LOCAL bool ICACHE_FLASH_ATTR check_data(char *precv, uint16 length){
 
 	ptemp = (char *)os_strstr(precv, "\r\n\r\n");
 
-	if (ptemp == NULL) {
-		return true;
-	}
+	if (ptemp != NULL) {
+		tmp_length -= ptemp - precv;
+		tmp_length -= 4;
+		tmp_totallength += tmp_length;
 
+		pdata = (char *)os_strstr(precv, "Content-Length: ");
 
-	tmp_length -= ptemp - precv;
-	tmp_length -= 4;
-	tmp_totallength += tmp_length;
+		if (pdata != NULL){
+			pdata += 16;
+			tmp_precvbuffer = (char *)os_strstr(pdata, "\r\n");
 
-	pdata = (char *)os_strstr(precv, "Content-Length: ");
-
-	if (pdata == NULL){
-		return true;
-	}
-
-	pdata += 16;
-
-	tmp_precvbuffer = (char *)os_strstr(pdata, "\r\n");
-
-	if (tmp_precvbuffer != NULL){
-
-		os_memcpy(length_buf, pdata, tmp_precvbuffer - pdata);
-		dat_sumlength = atoi(length_buf);
-		os_printf("A_dat:%u,tot:%u,lenght:%u\n",dat_sumlength,tmp_totallength,tmp_length);
-		if(dat_sumlength != tmp_totallength){
-			return false;
+			if (tmp_precvbuffer != NULL){
+				os_memcpy(length_buf, pdata, tmp_precvbuffer - pdata);
+				dat_sumlength = atoi(length_buf);
+				os_printf("A_dat:%u,tot:%u,lenght:%u\n",dat_sumlength,tmp_totallength,tmp_length);
+				if(dat_sumlength != tmp_totallength){
+					return false;
+				}
+			}
 		}
 	}
-
 	return true;
 }
 
@@ -91,9 +289,11 @@ LOCAL bool ICACHE_FLASH_ATTR save_data(char *precv, uint16 length) {
 			os_memcpy(precvbuffer, precv, os_strlen(precv));
 		}
 	} else {
+
 		if (precvbuffer != NULL) {
 			totallength += length;
 			os_memcpy(precvbuffer + os_strlen(precvbuffer), precv, length);
+
 		} else {
 			totallength = 0;
 			dat_sumlength = 0;
@@ -116,6 +316,7 @@ LOCAL void ICACHE_FLASH_ATTR parse_url(char *precv, URL_Frame *purl_frame){
 	uint8 length = 0;
 	char *pbuffer = NULL;
 	char *pbufer = NULL;
+	char *pmethod = NULL;
 
 	if (purl_frame == NULL || precv == NULL) {
 		return;
@@ -133,12 +334,32 @@ LOCAL void ICACHE_FLASH_ATTR parse_url(char *precv, URL_Frame *purl_frame){
 		os_memset(purl_frame->pFilename, 0, URLSize);
 
 		if (os_strncmp(pbuffer, "GET ", 4) == 0) {
-			purl_frame->Type = GET;
 			pbuffer += 4;
+			purl_frame->Type = GET;
+			
+
 		} else if (os_strncmp(pbuffer, "POST ", 5) == 0) {
-			purl_frame->Type = POST;
 			pbuffer += 5;
+			purl_frame->Type = POST;
+			
+
+		} else if (os_strncmp(pbuffer, "OPTIONS ", 8) == 0) {
+			pbuffer += 8;
+
+			pmethod = (char *)os_strstr(precv, "Access-Control-Request-Method: ");
+
+			if (pmethod != NULL){
+				pmethod+= 31;
+				if (os_strncmp(pmethod, "POST\r\n", 6) == 0){
+					purl_frame->Type = POST;
+				} else if (os_strncmp(pmethod, "GET\r\n", 5) == 0) {
+					purl_frame->Type = GET;
+				}
+			}
 		}
+
+		
+
 
 		pbuffer ++;
 		str = (char *)os_strstr(pbuffer, "?");
@@ -187,7 +408,7 @@ LOCAL void ICACHE_FLASH_ATTR data_send(void *arg, bool responseOK, char *psend) 
 
 	if (responseOK) {
 		os_sprintf(httphead,
-			"HTTP/1.0 200 OK\r\nContent-Length: %d\r\nServer: lwIP/1.4.0\r\n",
+			"HTTP/1.0 200 OK\r\nContent-Length: %d\r\nServer: LVLPREST/0.5.0\r\n",
 			psend ? os_strlen(psend) : 0);
 
 		if (psend) {
@@ -203,22 +424,16 @@ LOCAL void ICACHE_FLASH_ATTR data_send(void *arg, bool responseOK, char *psend) 
 		}
 	} else {
 		os_sprintf(httphead, "HTTP/1.0 400 BadRequest\r\n\
-			Content-Length: 0\r\nServer: lwIP/1.4.0\r\n\n");
+			Content-Length: 0\r\nServer: LVLPREST/0.5.0\r\n\n");
 		length = os_strlen(httphead);
 	}
 
 	if (psend) {
-	#ifdef SERVER_SSL_ENABLE
-		espconn_secure_sent(ptrespconn, pbuf, length);
-	#else
+		//espconn_secure_sent(ptrespconn, pbuf, length);
 		espconn_sent(ptrespconn, pbuf, length);
-	#endif
 	} else {
-	#ifdef SERVER_SSL_ENABLE
-		espconn_secure_sent(ptrespconn, httphead, length);
-	#else
+		//espconn_secure_sent(ptrespconn, httphead, length);
 		espconn_sent(ptrespconn, httphead, length);
-	#endif
 	}
 
 	if (pbuf) {
@@ -240,6 +455,19 @@ LOCAL void ICACHE_FLASH_ATTR response_send(void *arg, bool responseOK){
 
 
 
+LOCAL void ICACHE_FLASH_ATTR json_send(void *arg) {
+	char *pbuf = NULL;
+	pbuf = (char *)os_zalloc(jsonSize);
+	struct espconn *ptrespconn = arg;
+
+	json_ws_send((struct jsontree_value *)&RESTTree, "get", pbuf);
+
+	data_send(ptrespconn, true, pbuf);
+	os_free(pbuf);
+	pbuf = NULL;
+}
+
+
 
 
 
@@ -252,8 +480,9 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 	os_printf("len:%u\n",length);
 
 	if(check_data(pusrdata, length) == false){
+		save_data(pusrdata, length);
 		os_printf("Skip Packet\n");
-		goto _temp_exit;
+		return;
 	}
 
 	parse_flag = save_data(pusrdata, length);
@@ -262,7 +491,6 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 		response_send(ptrespconn, false);
 	}
 
-	os_printf("BUFFER DATA:\n%s\n\n", precvbuffer);
 	pURL_Frame = (URL_Frame *)os_zalloc(sizeof(URL_Frame));
 	parse_url(precvbuffer, pURL_Frame);
 
@@ -290,10 +518,17 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 				precvbuffer = NULL;
 			}
 
+			os_printf("JSON: %s\n\n", pParseBuffer);
+
+			struct jsontree_context js;
+			jsontree_setup(&js, (struct jsontree_value *)&RESTTree, json_putchar);
+			json_parse(&js, pParseBuffer);
+
 			os_free(pURL_Frame);
 			pURL_Frame = NULL;
 
-			response_send(ptrespconn, true);
+			json_send(ptrespconn);
+			//response_send(ptrespconn, true);
 			break;
 	}
 
@@ -304,8 +539,6 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 
 	os_free(pURL_Frame);
 	pURL_Frame = NULL;
-	_temp_exit:
-		;
 }
 
 LOCAL ICACHE_FLASH_ATTR void webserver_recon(void *arg, sint8 err) {
