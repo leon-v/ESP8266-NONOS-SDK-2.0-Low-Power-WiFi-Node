@@ -144,13 +144,13 @@ LOCAL int ICACHE_FLASH_ATTR REST_Get(struct jsontree_context *js_ctx) {
 	const char *path = jsontree_path_name(js_ctx, js_ctx->depth - 1);
 
 	if (os_strncmp(path, "threashold", 10) == 0) {
-		os_sprintf(string, "%s", "get threashold\n");
+		os_sprintf(string, "%s", "get threashold");
 
 	}else if (os_strncmp(path, "min", 3) == 0) {
-		os_sprintf(string, "%s", "get min\n");
+		os_sprintf(string, "%s", "get min");
 
 	}else if (os_strncmp(path, "max", 3) == 0) {
-		os_sprintf(string, "%s", "get max\n");
+		os_sprintf(string, "%s", "get max");
 
 	}
 
@@ -413,7 +413,7 @@ LOCAL void ICACHE_FLASH_ATTR data_send(void *arg, bool responseOK, char *psend) 
 
 		if (psend) {
 			os_sprintf(httphead + os_strlen(httphead),
-				"Content-type: application/json\r\nExpires: Fri, 10 Apr 2008 14:00:00 GMT\r\nPragma: no-cache\r\n\r\n");
+				"Access-Control-Allow-Origin: *\r\nContent-type: application/json\r\nExpires: Fri, 10 Apr 2008 14:00:00 GMT\r\nPragma: no-cache\r\n\r\n");
 			length = os_strlen(httphead) + os_strlen(psend);
 			pbuf = (char *)os_zalloc(length + 1);
 			os_memcpy(pbuf, httphead, os_strlen(httphead));

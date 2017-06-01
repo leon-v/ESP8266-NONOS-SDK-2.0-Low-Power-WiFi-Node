@@ -32,12 +32,8 @@ static os_timer_t osRechargeCapTask_timer;
 void osRechargeCapTask(void *arg){
 	os_timer_disarm(&osRechargeCapTask_timer);
 
+	wifi_set_sleep_type(LIGHT_SLEEP_T);
 	GPIO_DIS_OUTPUT(14);
-
-	os_delay_us(100);
-	wifi_set_sleep_type(LIGHT_SLEEP_T);
-	os_delay_us(100);
-	wifi_set_sleep_type(LIGHT_SLEEP_T);
 }
 
 void gpioInterruptTask(int * arg){
@@ -45,14 +41,12 @@ void gpioInterruptTask(int * arg){
 	uint32 gpio_status = GPIO_REG_READ(GPIO_STATUS_ADDRESS);
 
 	os_printf("gpioInterruptTask\r\n");
-
-	wifi_set_sleep_type(NONE_SLEEP_T);
 	
 	
 	GPIO_OUTPUT_SET(14, 0);// This prevents latch-up, but don't run it any more than once, it will crash
 	GPIO_OUTPUT_SET(14, 1);// Start the charge cycle of the interrupt capacitor
 
-	// Let the interrupt capacitor discharge after 5 milliseconds
+	// Let the interrupt capacitor discharge after 3 milliseconds
 	os_timer_disarm(&osRechargeCapTask_timer);
 	os_timer_arm(&osRechargeCapTask_timer, 3, 1);
 
@@ -105,7 +99,6 @@ void ICACHE_FLASH_ATTR  user_init(void) {
 
 	// Reset sleep circuitry
 	wifi_set_sleep_type(NONE_SLEEP_T);
-	wifi_fpm_set_sleep_type(NONE_SLEEP_T);
 }
 
 uint32 ICACHE_FLASH_ATTR user_rf_cal_sector_set(void){
