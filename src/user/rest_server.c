@@ -1,18 +1,14 @@
-#include "simple_rest_server.h"
+#include "rest_server.h"
 
 LOCAL char *precvbuffer;
 static uint32 dat_sumlength = 0;
 
+struct REST_Endpoint_t restEndpoints[ENDPOINT_COUNT];
 
-
-
-
-
-
-
-
-
-
+int restEndpointCount = 0;
+void ICACHE_FLASH_ATTR rest_server_add_endpoint(struct REST_Endpoint_t restEndpoint) {
+	restEndpoints[restEndpointCount++] = restEndpoint;
+}
 
 
 LOCAL char *json_buf;
@@ -138,69 +134,7 @@ void ICACHE_FLASH_ATTR json_ws_send(struct jsontree_value *tree, const char *pat
 
 
 
-LOCAL int ICACHE_FLASH_ATTR REST_Get(struct jsontree_context *js_ctx) {
-	char string[32];
 
-	const char *path = jsontree_path_name(js_ctx, js_ctx->depth - 1);
-
-	if (os_strncmp(path, "threashold", 10) == 0) {
-		os_sprintf(string, "%s", "get threashold");
-
-	}else if (os_strncmp(path, "min", 3) == 0) {
-		os_sprintf(string, "%s", "get min");
-
-	}else if (os_strncmp(path, "max", 3) == 0) {
-		os_sprintf(string, "%s", "get max");
-
-	}
-
-	jsontree_write_string(js_ctx, string);
-
-	return 0;
-}
-LOCAL int ICACHE_FLASH_ATTR REST_Set(struct jsontree_context *js_ctx, struct jsonparse_state *parser){
-	int type;
-
-	while ((type = jsonparse_next(parser)) != 0) {
-		if (type == JSON_TYPE_PAIR_NAME) {
-			if (jsonparse_strcmp_value(parser, "threashold") == 0) {
-				jsonparse_next(parser);
-				jsonparse_next(parser);
-				uint8 threashold;
-				threashold = jsonparse_get_value_as_int(parser);
-				os_printf("set threashold %d\n", threashold);
-
-			}else if (jsonparse_strcmp_value(parser, "min") == 0) {
-				jsonparse_next(parser);
-				jsonparse_next(parser);
-				uint8 min;
-				min = jsonparse_get_value_as_int(parser);
-				os_printf("set min %d\n", min);
-
-			}else if (jsonparse_strcmp_value(parser, "max") == 0) {
-				jsonparse_next(parser);
-				jsonparse_next(parser);
-				uint8 max;
-				max = jsonparse_get_value_as_int(parser);
-				os_printf("set max %d\n", max);
-			}
-		}
-	}
-
-	return 0;
-}
-
-LOCAL struct jsontree_callback REST_Callback = JSONTREE_CALLBACK(REST_Get, REST_Set);
-
-JSONTREE_OBJECT(ADCTree,
-	JSONTREE_PAIR("threashold", &REST_Callback),
-	JSONTREE_PAIR("min", &REST_Callback),
-	JSONTREE_PAIR("max", &REST_Callback),
-);
-JSONTREE_OBJECT(RESTTree,
-	JSONTREE_PAIR("get", &ADCTree),
-	JSONTREE_PAIR("set", &ADCTree)
-);
 
 
 
@@ -324,76 +258,67 @@ LOCAL void ICACHE_FLASH_ATTR parse_url(char *precv, URL_Frame *purl_frame){
 
 	pbuffer = (char *)os_strstr(precv, "Host:");
 
-	if (pbuffer != NULL) {
-		length = pbuffer - precv;
-		pbufer = (char *)os_zalloc(length + 1);
-		pbuffer = pbufer;
-		os_memcpy(pbuffer, precv, length);
-		os_memset(purl_frame->pSelect, 0, URLSize);
-		os_memset(purl_frame->pCommand, 0, URLSize);
-		os_memset(purl_frame->pFilename, 0, URLSize);
-
-		if (os_strncmp(pbuffer, "GET ", 4) == 0) {
-			pbuffer += 4;
-			purl_frame->Type = GET;
-			
-
-		} else if (os_strncmp(pbuffer, "POST ", 5) == 0) {
-			pbuffer += 5;
-			purl_frame->Type = POST;
-			
-
-		} else if (os_strncmp(pbuffer, "OPTIONS ", 8) == 0) {
-			pbuffer += 8;
-
-			pmethod = (char *)os_strstr(precv, "Access-Control-Request-Method: ");
-
-			if (pmethod != NULL){
-				pmethod+= 31;
-				if (os_strncmp(pmethod, "POST\r\n", 6) == 0){
-					purl_frame->Type = POST;
-				} else if (os_strncmp(pmethod, "GET\r\n", 5) == 0) {
-					purl_frame->Type = GET;
-				}
-			}
-		}
-
-		
-
-
-		pbuffer ++;
-		str = (char *)os_strstr(pbuffer, "?");
-
-		if (str != NULL) {
-			length = str - pbuffer;
-			os_memcpy(purl_frame->pSelect, pbuffer, length);
-			str ++;
-			pbuffer = (char *)os_strstr(str, "=");
-
-			if (pbuffer != NULL) {
-				length = pbuffer - str;
-				os_memcpy(purl_frame->pCommand, str, length);
-				pbuffer ++;
-				str = (char *)os_strstr(pbuffer, "&");
-
-				if (str != NULL) {
-					length = str - pbuffer;
-					os_memcpy(purl_frame->pFilename, pbuffer, length);
-				} else {
-					str = (char *)os_strstr(pbuffer, " HTTP");
-
-					if (str != NULL) {
-						length = str - pbuffer;
-						os_memcpy(purl_frame->pFilename, pbuffer, length);
-					}
-				}
-			}
-		}
-
-		os_free(pbufer);
-	} else {
+	if (pbuffer == NULL) {
 		return;
 	}
+	length = pbuffer - precv;
+	pbufer = (char *)os_zalloc(length + 1);
+	pbuffer = pbufer;
+	os_memcpy(pbuffer, precv, length);
+	os_memset(purl_frame->Path, 0, URLSize);
+
+	if (os_strncmp(pbuffer, "GET ", 4) == 0) {
+		pbuffer += 4;
+		purl_frame->Type = GET;
+		
+
+	} else if (os_strncmp(pbuffer, "POST ", 5) == 0) {
+		pbuffer += 5;
+		purl_frame->Type = POST;
+		
+
+	} else if (os_strncmp(pbuffer, "OPTIONS ", 8) == 0) {
+		pbuffer += 8;
+
+		pmethod = (char *)os_strstr(precv, "Access-Control-Request-Method: ");
+
+		if (pmethod != NULL){
+			pmethod+= 31;
+			if (os_strncmp(pmethod, "POST\r\n", 6) == 0){
+				purl_frame->Type = POST;
+			} else if (os_strncmp(pmethod, "GET\r\n", 5) == 0) {
+				purl_frame->Type = GET;
+			}
+		}
+	}
+
+	// Skip past the space ?
+	pbuffer++;
+
+	// Find the end of the URL
+	str = (char *)os_strstr(pbuffer, "?");
+	if (str == NULL) {
+		str = (char *)os_strstr(pbuffer, " ");
+	}
+
+	// No End !? ERROR! DOES NOT COMPUTE
+	if (str == NULL) {
+		os_free(pbufer);
+		return;
+	}
+
+	// Store the path into Path
+	length = str - pbuffer;
+	os_memcpy(purl_frame->Path, pbuffer, length);
+
+	// Skip the pointer to the next thing
+	pbuffer = str;
+
+	// After this we can look for URL paramaters, but REST doesnt use those, so im not going to add it now
+
+	// After this we can look for HTTP version, but REST doesnt use those, so im not going to add it now
+
+	os_free(pbufer);
 }
 
 
@@ -460,7 +385,8 @@ LOCAL void ICACHE_FLASH_ATTR json_send(void *arg) {
 	pbuf = (char *)os_zalloc(jsonSize);
 	struct espconn *ptrespconn = arg;
 
-	json_ws_send((struct jsontree_value *)&RESTTree, "get", pbuf);
+	
+	//json_ws_send((struct jsontree_value *)&RESTTree, "get", pbuf);
 
 	data_send(ptrespconn, true, pbuf);
 	os_free(pbuf);
@@ -494,6 +420,8 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 	pURL_Frame = (URL_Frame *)os_zalloc(sizeof(URL_Frame));
 	parse_url(precvbuffer, pURL_Frame);
 
+	os_printf("pURL_Frame->Path: %s|\n\n", pURL_Frame->Path);
+
 	switch (pURL_Frame->Type) {
 		case GET:
 
@@ -519,10 +447,11 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 			}
 
 			os_printf("JSON: %s\n\n", pParseBuffer);
+			
 
 			struct jsontree_context js;
-			jsontree_setup(&js, (struct jsontree_value *)&RESTTree, json_putchar);
-			json_parse(&js, pParseBuffer);
+			//jsontree_setup(&js, (struct jsontree_value *)&RESTTree, json_putchar);
+			//json_parse(&js, pParseBuffer);
 
 			os_free(pURL_Frame);
 			pURL_Frame = NULL;
@@ -561,7 +490,7 @@ LOCAL ICACHE_FLASH_ATTR void webserver_discon(void *arg) {
 	);
 }
 
-LOCAL void ICACHE_FLASH_ATTR webserver_listen(void *arg) {
+LOCAL void ICACHE_FLASH_ATTR rest_server_listen(void *arg) {
     struct espconn *pesp_conn = arg;
 
     espconn_regist_recvcb(pesp_conn, webserver_recv);
@@ -569,7 +498,7 @@ LOCAL void ICACHE_FLASH_ATTR webserver_listen(void *arg) {
     espconn_regist_disconcb(pesp_conn, webserver_discon);
 }
 
-void ICACHE_FLASH_ATTR init_simple_rest_server() {
+void ICACHE_FLASH_ATTR rest_server_init() {
 	LOCAL struct espconn esp_conn;
 	LOCAL esp_tcp esptcp;
 
@@ -577,7 +506,7 @@ void ICACHE_FLASH_ATTR init_simple_rest_server() {
 	esp_conn.state = ESPCONN_NONE;
 	esp_conn.proto.tcp = &esptcp;
 	esp_conn.proto.tcp->local_port = 80;
-	espconn_regist_connectcb(&esp_conn, webserver_listen);
+	espconn_regist_connectcb(&esp_conn, rest_server_listen);
 
 	#ifdef SERVER_SSL_ENABLE
 		espconn_secure_set_default_certificate(default_certificate, default_certificate_len);

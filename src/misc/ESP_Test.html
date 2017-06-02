@@ -1,0 +1,25 @@
+<?php header('Access-Control-Allow-Origin: *'); ?><html>
+<head>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+</head>
+<body>
+        <script type="text/javascript">
+                var lo_data = {
+                        set:{
+                                threashold:50,
+                                min:10,
+                                max:100
+                        }
+                }
+
+                $.ajax({
+                        type: 'POST',
+                        url: 'http://192.168.7.135/adc/0',
+                        data: JSON.stringify(lo_data),
+                        success: function(lo_result){
+                                console.log(lo_result);
+                        }
+                });
+        </script>
+</body>
+</html>

@@ -4,7 +4,7 @@
 #include "user_interface.h"
 #include "espconn.h"
 
-#include "simple_rest_server.h"
+#include "rest_server.h"
 
 #include "driver/uart.h"
 
@@ -95,7 +95,8 @@ void ICACHE_FLASH_ATTR  user_init(void) {
 	os_timer_arm(&osRechargeCapTask_timer, 1000, 1);
 
 	// Start listening for connections
-	init_simple_rest_server();
+	
+	rest_server_init();
 
 	// Reset sleep circuitry
 	wifi_set_sleep_type(NONE_SLEEP_T);

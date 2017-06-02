@@ -23,7 +23,11 @@
 
 #define URLSize 10
 
+#define ENDPOINT_COUNT 10
+
 #define jsonSize   2*1024
+
+
 
 typedef enum _ParmType {
     ADC = 0
@@ -36,11 +40,16 @@ typedef enum ProtocolType {
 
 typedef struct URL_Frame {
     enum ProtocolType Type;
-    char pSelect[URLSize];
-    char pCommand[URLSize];
-    char pFilename[URLSize];
+    char Path[URLSize];
 } URL_Frame;
 
-void init_simple_rest_server(void);
+typedef struct REST_Endpoint_t{
+	char page[URLSize];
+	char endpoint[URLSize];
+	struct jsontree_value * JSONTree;
+} REST_Endpoint_t;
+
+void init_rest_server(void);
+void ICACHE_FLASH_ATTR rest_server_add_endpoint(struct REST_Endpoint_t restEndpoint);
 
 #endif
