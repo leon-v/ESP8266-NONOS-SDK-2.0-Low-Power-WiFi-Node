@@ -96,6 +96,7 @@ void ICACHE_FLASH_ATTR  user_init(void) {
 
 	// Start listening for connections
 	
+	rest_server_endpoint_adc_init();
 	rest_server_init();
 
 	// Reset sleep circuitry

@@ -68,8 +68,8 @@ JSONTREE_OBJECT(RESTTree,
 REST_Endpoint_t REST_Endpoint;
 void ICACHE_FLASH_ATTR rest_server_endpoint_adc_init(){
 
-	os_sprintf(REST_Endpoint.page, "adc");
-	os_sprintf(REST_Endpoint.endpoint, "0");
+	os_sprintf(REST_Endpoint.Service, "adc");
+	os_sprintf(REST_Endpoint.Endpoint, "0");
 	REST_Endpoint.JSONTree = (struct jsontree_value *) &RESTTree;
 
 	rest_server_add_endpoint(REST_Endpoint);

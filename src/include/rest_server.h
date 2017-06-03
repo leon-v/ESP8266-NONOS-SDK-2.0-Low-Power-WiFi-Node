@@ -41,11 +41,13 @@ typedef enum ProtocolType {
 typedef struct URL_Frame {
     enum ProtocolType Type;
     char Path[URLSize];
+    char Service[URLSize];
+    char Endpoint[URLSize];
 } URL_Frame;
 
 typedef struct REST_Endpoint_t{
-	char page[URLSize];
-	char endpoint[URLSize];
+	char Service[URLSize];
+	char Endpoint[URLSize];
 	struct jsontree_value * JSONTree;
 } REST_Endpoint_t;
 

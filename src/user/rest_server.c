@@ -5,9 +5,14 @@ static uint32 dat_sumlength = 0;
 
 struct REST_Endpoint_t restEndpoints[ENDPOINT_COUNT];
 
+
+
 int restEndpointCount = 0;
 void ICACHE_FLASH_ATTR rest_server_add_endpoint(struct REST_Endpoint_t restEndpoint) {
+
 	restEndpoints[restEndpointCount++] = restEndpoint;
+
+	os_printf("REST Endpoint %s/%s added.", restEndpoint.Service, restEndpoint.Endpoint);
 }
 
 
@@ -295,24 +300,49 @@ LOCAL void ICACHE_FLASH_ATTR parse_url(char *precv, URL_Frame *purl_frame){
 	// Skip past the space ?
 	pbuffer++;
 
-	// Find the end of the URL
-	str = (char *)os_strstr(pbuffer, "?");
-	if (str == NULL) {
-		str = (char *)os_strstr(pbuffer, " ");
+	// Find the Service in the URL
+	str = (char *)os_strstr(pbuffer, "/");
+
+	if (str != NULL) {
+
+		length = str - pbuffer;
+		os_memcpy(purl_frame->Service, pbuffer, length);
+
+		pbuffer = str;
+
+		pbuffer++;// Skip the /
+
+		// Find the end of the URL
+		str = (char *)os_strstr(pbuffer, "?");
+		if (str == NULL) {
+			str = (char *)os_strstr(pbuffer, " ");
+		}
+
+		// No End !? ERROR! DOES NOT COMPUTE
+		if (str == NULL) {
+			os_free(pbufer);
+			return;
+		}
+
+		length = str - pbuffer;
+		os_memcpy(purl_frame->Endpoint, pbuffer, length);
+	} else {
+		// Find the end of the URL
+		str = (char *)os_strstr(pbuffer, "?");
+		if (str == NULL) {
+			str = (char *)os_strstr(pbuffer, " ");
+		}
+
+		// No End !? ERROR! DOES NOT COMPUTE
+		if (str == NULL) {
+			os_free(pbufer);
+			return;
+		}
+
+		length = str - pbuffer;
+		os_memcpy(purl_frame->Service, pbuffer, length);
 	}
 
-	// No End !? ERROR! DOES NOT COMPUTE
-	if (str == NULL) {
-		os_free(pbufer);
-		return;
-	}
-
-	// Store the path into Path
-	length = str - pbuffer;
-	os_memcpy(purl_frame->Path, pbuffer, length);
-
-	// Skip the pointer to the next thing
-	pbuffer = str;
 
 	// After this we can look for URL paramaters, but REST doesnt use those, so im not going to add it now
 
@@ -380,13 +410,32 @@ LOCAL void ICACHE_FLASH_ATTR response_send(void *arg, bool responseOK){
 
 
 
-LOCAL void ICACHE_FLASH_ATTR json_send(void *arg) {
+LOCAL void ICACHE_FLASH_ATTR rest_server_endpoint_get(URL_Frame *pURL_Frame, struct espconn * ptrespconn) {
+
 	char *pbuf = NULL;
 	pbuf = (char *)os_zalloc(jsonSize);
-	struct espconn *ptrespconn = arg;
 
-	
-	//json_ws_send((struct jsontree_value *)&RESTTree, "get", pbuf);
+	int restEndpointIndex = 0;
+	REST_Endpoint_t restEndpoint;
+	while (restEndpointIndex < restEndpointCount) {
+
+		restEndpoint = restEndpoints[restEndpointIndex];
+
+		if (os_strncmp(restEndpoint.Service, pURL_Frame->Service, os_strlen(pURL_Frame->Service)) != 0){
+			restEndpointIndex++;
+			continue;
+		}
+
+		if (os_strncmp(restEndpoint.Endpoint, pURL_Frame->Endpoint, os_strlen(pURL_Frame->Endpoint)) != 0){
+			restEndpointIndex++;
+			continue;
+		}
+		
+		os_printf("Processing REST GET Endpoint: %s/%s\n", pURL_Frame->Service, pURL_Frame->Endpoint);
+
+		json_ws_send(restEndpoint.JSONTree, "get", pbuf);
+		break;
+	}
 
 	data_send(ptrespconn, true, pbuf);
 	os_free(pbuf);
@@ -396,6 +445,34 @@ LOCAL void ICACHE_FLASH_ATTR json_send(void *arg) {
 
 
 
+bool ICACHE_FLASH_ATTR rest_server_endpoint_set(URL_Frame *pURL_Frame, char *pParseBuffer){
+
+	int restEndpointIndex = 0;
+	REST_Endpoint_t restEndpoint;
+	while (restEndpointIndex < restEndpointCount) {
+
+		restEndpoint = restEndpoints[restEndpointIndex];
+
+		if (os_strncmp(restEndpoint.Service, pURL_Frame->Service, os_strlen(pURL_Frame->Service)) != 0){
+			restEndpointIndex++;
+			continue;
+		}
+
+		if (os_strncmp(restEndpoint.Endpoint, pURL_Frame->Endpoint, os_strlen(pURL_Frame->Endpoint)) != 0){
+			restEndpointIndex++;
+			continue;
+		}
+		
+		os_printf("Processing REST Endpoint: %s/%s\n", pURL_Frame->Service, pURL_Frame->Endpoint);
+
+		struct jsontree_context js;
+		jsontree_setup(&js, restEndpoint.JSONTree, json_putchar);
+		json_parse(&js, pParseBuffer);
+
+		return true;
+	}
+	return false;
+}
 
 LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned short length) {
 	URL_Frame *pURL_Frame = NULL;
@@ -420,7 +497,11 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 	pURL_Frame = (URL_Frame *)os_zalloc(sizeof(URL_Frame));
 	parse_url(precvbuffer, pURL_Frame);
 
-	os_printf("pURL_Frame->Path: %s|\n\n", pURL_Frame->Path);
+
+	//str = (char *)os_strstr(pbuffer, "?");
+
+	os_printf("pURL_Frame->Service: %s\n\n", pURL_Frame->Service);
+	os_printf("pURL_Frame->Endpoint: %s\n\n", pURL_Frame->Endpoint);
 
 	switch (pURL_Frame->Type) {
 		case GET:
@@ -448,16 +529,15 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 
 			os_printf("JSON: %s\n\n", pParseBuffer);
 			
-
-			struct jsontree_context js;
-			//jsontree_setup(&js, (struct jsontree_value *)&RESTTree, json_putchar);
-			//json_parse(&js, pParseBuffer);
+			if (rest_server_endpoint_set(pURL_Frame, pParseBuffer)) {
+				rest_server_endpoint_get(pURL_Frame, ptrespconn);
+			} else {
+				response_send(ptrespconn, false);
+			}
 
 			os_free(pURL_Frame);
 			pURL_Frame = NULL;
-
-			json_send(ptrespconn);
-			//response_send(ptrespconn, true);
+			
 			break;
 	}
 
