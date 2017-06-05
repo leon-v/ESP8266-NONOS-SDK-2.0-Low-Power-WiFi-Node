@@ -51,7 +51,7 @@ typedef struct REST_Endpoint_t{
 	struct jsontree_value * JSONTree;
 } REST_Endpoint_t;
 
-void init_rest_server(void);
-void ICACHE_FLASH_ATTR rest_server_add_endpoint(struct REST_Endpoint_t restEndpoint);
+void RESTServerInit(void);
+void ICACHE_FLASH_ATTR RESTServerAddEndpoint(struct REST_Endpoint_t restEndpoint);
 
 #endif

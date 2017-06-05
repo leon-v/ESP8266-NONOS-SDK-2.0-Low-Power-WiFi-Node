@@ -8,26 +8,24 @@ struct REST_Endpoint_t restEndpoints[ENDPOINT_COUNT];
 
 
 int restEndpointCount = 0;
-void ICACHE_FLASH_ATTR rest_server_add_endpoint(struct REST_Endpoint_t restEndpoint) {
-
+void ICACHE_FLASH_ATTR RESTServerAddEndpoint(struct REST_Endpoint_t restEndpoint) {
 	restEndpoints[restEndpointCount++] = restEndpoint;
-
 	os_printf("REST Endpoint %s/%s added.", restEndpoint.Service, restEndpoint.Endpoint);
 }
 
 
-LOCAL char *json_buf;
-LOCAL int pos;
-LOCAL int size;
-int ICACHE_FLASH_ATTR json_putchar(int c) {
-    if (json_buf != NULL && pos <= size) {
-        json_buf[pos++] = c;
-        return c;
+LOCAL char *jsonBuffer;
+LOCAL int jsonBufferIndex;
+LOCAL int jsonBufferSize;
+int ICACHE_FLASH_ATTR RESTServerJSONPutchar(int character) {
+    if (jsonBuffer != NULL && jsonBufferIndex <= jsonBufferSize) {
+        jsonBuffer[jsonBufferIndex++] = character;
+        return character;
     }
 
     return 0;
 }
-void ICACHE_FLASH_ATTR json_parse(struct jsontree_context *json, char *ptrJSONMessage){
+void ICACHE_FLASH_ATTR RESTServerJSONParse(struct jsontree_context *json, char *jsonMessage){
     /* Set value */
     struct jsontree_value *v;
     struct jsontree_callback *c;
@@ -45,13 +43,13 @@ void ICACHE_FLASH_ATTR json_parse(struct jsontree_context *json, char *ptrJSONMe
         if (c->set != NULL) {
             struct jsonparse_state js;
 
-            jsonparse_setup(&js, ptrJSONMessage, os_strlen(ptrJSONMessage));
+            jsonparse_setup(&js, jsonMessage, os_strlen(jsonMessage));
             c->set(json, &js);
         }
     }
 }
 
-struct jsontree_value *ICACHE_FLASH_ATTR find_json_path(struct jsontree_context *json, const char *path) {
+struct jsontree_value *ICACHE_FLASH_ATTR RESTServerJSONFindPath(struct jsontree_context *json, const char *path) {
 	struct jsontree_value *v;
 	const char *start;
 	const char *end;
@@ -101,27 +99,27 @@ struct jsontree_value *ICACHE_FLASH_ATTR find_json_path(struct jsontree_context 
 	json->callback_state = 0;
 	return v;
 }
-void ICACHE_FLASH_ATTR json_ws_send(struct jsontree_value *tree, const char *path, char *pbuf) {
+void ICACHE_FLASH_ATTR RESTServerJSONSend(struct jsontree_value *tree, const char *path, char *pbuf) {
 	struct jsontree_context json;
     /* maxsize = 128 bytes */
-	json_buf = (char *)os_malloc(jsonSize);
+	jsonBuffer = (char *)os_malloc(jsonSize);
 
     /* reset state and set max-size */
     /* NOTE: packet will be truncated at 512 bytes */
-	pos = 0;
-	size = jsonSize;
+	jsonBufferIndex = 0;
+	jsonBufferSize = jsonSize;
 
 	json.values[0] = (struct jsontree_value *)tree;
 	jsontree_reset(&json);
-	find_json_path(&json, path);
+	RESTServerJSONFindPath(&json, path);
 	json.path = json.depth;
-	json.putchar = json_putchar;
+	json.putchar = RESTServerJSONPutchar;
 
 	while (jsontree_print_next(&json) && json.path <= json.depth);
 
-	json_buf[pos] = 0;
-	os_memcpy(pbuf, json_buf, pos);
-	os_free(json_buf);
+	jsonBuffer[jsonBufferIndex] = 0;
+	os_memcpy(pbuf, jsonBuffer, jsonBufferIndex);
+	os_free(jsonBuffer);
 }
 
 
@@ -152,7 +150,7 @@ void ICACHE_FLASH_ATTR json_ws_send(struct jsontree_value *tree, const char *pat
 
 
 
-LOCAL bool ICACHE_FLASH_ATTR check_data(char *precv, uint16 length) {
+LOCAL bool ICACHE_FLASH_ATTR RESTServerPacketCheckSize(char *precv, uint16 length) {
         //bool flag = true;
 	char length_buf[10] = {0};
 	char *ptemp = NULL;
@@ -188,7 +186,7 @@ LOCAL bool ICACHE_FLASH_ATTR check_data(char *precv, uint16 length) {
 }
 
 
-LOCAL bool ICACHE_FLASH_ATTR save_data(char *precv, uint16 length) {
+LOCAL bool ICACHE_FLASH_ATTR RESTServerPacketSave(char *precv, uint16 length) {
 	bool flag = false;
 	char length_buf[10] = {0};
 	char *ptemp = NULL;
@@ -250,7 +248,7 @@ LOCAL bool ICACHE_FLASH_ATTR save_data(char *precv, uint16 length) {
 }
 
 
-LOCAL void ICACHE_FLASH_ATTR parse_url(char *precv, URL_Frame *purl_frame){
+LOCAL void ICACHE_FLASH_ATTR RESTServerURLParse(char *precv, URL_Frame *purl_frame){
 	char *str = NULL;
 	uint8 length = 0;
 	char *pbuffer = NULL;
@@ -354,7 +352,7 @@ LOCAL void ICACHE_FLASH_ATTR parse_url(char *precv, URL_Frame *purl_frame){
 
 
 
-LOCAL void ICACHE_FLASH_ATTR data_send(void *arg, bool responseOK, char *psend) {
+LOCAL void ICACHE_FLASH_ATTR RESTServerSend(void *arg, bool responseOK, char *psend) {
 	uint16 length = 0;
 	char *pbuf = NULL;
 	char httphead[256];
@@ -405,12 +403,12 @@ LOCAL void ICACHE_FLASH_ATTR data_send(void *arg, bool responseOK, char *psend) 
 
 LOCAL void ICACHE_FLASH_ATTR response_send(void *arg, bool responseOK){
 	struct espconn *ptrespconn = arg;
-	data_send(ptrespconn, responseOK, NULL);
+	RESTServerSend(ptrespconn, responseOK, NULL);
 }
 
 
 
-LOCAL void ICACHE_FLASH_ATTR rest_server_endpoint_get(URL_Frame *pURL_Frame, struct espconn * ptrespconn) {
+LOCAL void ICACHE_FLASH_ATTR RESTServerEndpointGet(URL_Frame *pURL_Frame, struct espconn * ptrespconn) {
 
 	char *pbuf = NULL;
 	pbuf = (char *)os_zalloc(jsonSize);
@@ -433,11 +431,11 @@ LOCAL void ICACHE_FLASH_ATTR rest_server_endpoint_get(URL_Frame *pURL_Frame, str
 		
 		os_printf("Processing REST GET Endpoint: %s/%s\n", pURL_Frame->Service, pURL_Frame->Endpoint);
 
-		json_ws_send(restEndpoint.JSONTree, "get", pbuf);
+		RESTServerJSONSend(restEndpoint.JSONTree, "get", pbuf);
 		break;
 	}
 
-	data_send(ptrespconn, true, pbuf);
+	RESTServerSend(ptrespconn, true, pbuf);
 	os_free(pbuf);
 	pbuf = NULL;
 }
@@ -445,7 +443,7 @@ LOCAL void ICACHE_FLASH_ATTR rest_server_endpoint_get(URL_Frame *pURL_Frame, str
 
 
 
-bool ICACHE_FLASH_ATTR rest_server_endpoint_set(URL_Frame *pURL_Frame, char *pParseBuffer){
+bool ICACHE_FLASH_ATTR RESTServerEndpointSet(URL_Frame *pURL_Frame, char *pParseBuffer){
 
 	int restEndpointIndex = 0;
 	REST_Endpoint_t restEndpoint;
@@ -466,15 +464,15 @@ bool ICACHE_FLASH_ATTR rest_server_endpoint_set(URL_Frame *pURL_Frame, char *pPa
 		os_printf("Processing REST Endpoint: %s/%s\n", pURL_Frame->Service, pURL_Frame->Endpoint);
 
 		struct jsontree_context js;
-		jsontree_setup(&js, restEndpoint.JSONTree, json_putchar);
-		json_parse(&js, pParseBuffer);
+		jsontree_setup(&js, restEndpoint.JSONTree, RESTServerJSONPutchar);
+		RESTServerJSONParse(&js, pParseBuffer);
 
 		return true;
 	}
 	return false;
 }
 
-LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned short length) {
+LOCAL void ICACHE_FLASH_ATTR RESTServerPacketReceive(void *arg, char *pusrdata, unsigned short length) {
 	URL_Frame *pURL_Frame = NULL;
 	char *pParseBuffer = NULL;
 	bool parse_flag = false;
@@ -482,38 +480,34 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 
 	os_printf("len:%u\n",length);
 
-	if(check_data(pusrdata, length) == false){
-		save_data(pusrdata, length);
+	if(RESTServerPacketCheckSize(pusrdata, length) == false){
+		RESTServerPacketSave(pusrdata, length);
 		os_printf("Skip Packet\n");
 		return;
 	}
 
-	parse_flag = save_data(pusrdata, length);
+	parse_flag = RESTServerPacketSave(pusrdata, length);
 
 	if (parse_flag == false) {
 		response_send(ptrespconn, false);
 	}
 
 	pURL_Frame = (URL_Frame *)os_zalloc(sizeof(URL_Frame));
-	parse_url(precvbuffer, pURL_Frame);
+	RESTServerURLParse(precvbuffer, pURL_Frame);
 
 
 	//str = (char *)os_strstr(pbuffer, "?");
 
-	os_printf("pURL_Frame->Service: %s\n\n", pURL_Frame->Service);
-	os_printf("pURL_Frame->Endpoint: %s\n\n", pURL_Frame->Endpoint);
-
 	switch (pURL_Frame->Type) {
 		case GET:
-
-			os_printf("We have a GET request.\n");
+			os_printf("GET request.\n");
 
 			response_send(ptrespconn, true);
 			break;
 
 		case POST:
+			os_printf("POST request.\n");
 
-			os_printf("We have a POST request.\n");
 			pParseBuffer = (char *)os_strstr(precvbuffer, "\r\n\r\n");
 
 			if (pParseBuffer == NULL) {
@@ -527,10 +521,10 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 				precvbuffer = NULL;
 			}
 
-			os_printf("JSON: %s\n\n", pParseBuffer);
+			//os_printf("JSON: %s\n\n", pParseBuffer);
 			
-			if (rest_server_endpoint_set(pURL_Frame, pParseBuffer)) {
-				rest_server_endpoint_get(pURL_Frame, ptrespconn);
+			if (RESTServerEndpointSet(pURL_Frame, pParseBuffer)) {
+				RESTServerEndpointGet(pURL_Frame, ptrespconn);
 			} else {
 				response_send(ptrespconn, false);
 			}
@@ -550,35 +544,35 @@ LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned 
 	pURL_Frame = NULL;
 }
 
-LOCAL ICACHE_FLASH_ATTR void webserver_recon(void *arg, sint8 err) {
+LOCAL ICACHE_FLASH_ATTR void RESTServerReconnect(void *arg, sint8 err) {
 	struct espconn *pesp_conn = arg;
 
-	os_printf("webserver's %d.%d.%d.%d:%d err %d reconnect\n", 
-		pesp_conn->proto.tcp->remote_ip[0],
-		pesp_conn->proto.tcp->remote_ip[1],pesp_conn->proto.tcp->remote_ip[2],
-		pesp_conn->proto.tcp->remote_ip[3],pesp_conn->proto.tcp->remote_port, err
-	);
+	// os_printf("webserver's %d.%d.%d.%d:%d err %d reconnect\n", 
+	// 	pesp_conn->proto.tcp->remote_ip[0],
+	// 	pesp_conn->proto.tcp->remote_ip[1],pesp_conn->proto.tcp->remote_ip[2],
+	// 	pesp_conn->proto.tcp->remote_ip[3],pesp_conn->proto.tcp->remote_port, err
+	// );
 }
 
-LOCAL ICACHE_FLASH_ATTR void webserver_discon(void *arg) {
+LOCAL ICACHE_FLASH_ATTR void RESTServerDisconnect(void *arg) {
 	struct espconn *pesp_conn = arg;
 
-	os_printf("webserver's %d.%d.%d.%d:%d disconnect\n",
-		pesp_conn->proto.tcp->remote_ip[0],
-		pesp_conn->proto.tcp->remote_ip[1],pesp_conn->proto.tcp->remote_ip[2],
-		pesp_conn->proto.tcp->remote_ip[3],pesp_conn->proto.tcp->remote_port
-	);
+	// os_printf("webserver's %d.%d.%d.%d:%d disconnect\n",
+	// 	pesp_conn->proto.tcp->remote_ip[0],
+	// 	pesp_conn->proto.tcp->remote_ip[1],pesp_conn->proto.tcp->remote_ip[2],
+	// 	pesp_conn->proto.tcp->remote_ip[3],pesp_conn->proto.tcp->remote_port
+	// );
 }
 
-LOCAL void ICACHE_FLASH_ATTR rest_server_listen(void *arg) {
+LOCAL void ICACHE_FLASH_ATTR RESTServerStartListen(void *arg) {
     struct espconn *pesp_conn = arg;
 
-    espconn_regist_recvcb(pesp_conn, webserver_recv);
-    espconn_regist_reconcb(pesp_conn, webserver_recon);
-    espconn_regist_disconcb(pesp_conn, webserver_discon);
+    espconn_regist_recvcb(pesp_conn, RESTServerPacketReceive);
+    espconn_regist_reconcb(pesp_conn, RESTServerReconnect);
+    espconn_regist_disconcb(pesp_conn, RESTServerDisconnect);
 }
 
-void ICACHE_FLASH_ATTR rest_server_init() {
+void ICACHE_FLASH_ATTR RESTServerInit() {
 	LOCAL struct espconn esp_conn;
 	LOCAL esp_tcp esptcp;
 
@@ -586,7 +580,7 @@ void ICACHE_FLASH_ATTR rest_server_init() {
 	esp_conn.state = ESPCONN_NONE;
 	esp_conn.proto.tcp = &esptcp;
 	esp_conn.proto.tcp->local_port = 80;
-	espconn_regist_connectcb(&esp_conn, rest_server_listen);
+	espconn_regist_connectcb(&esp_conn, RESTServerStartListen);
 
 	#ifdef SERVER_SSL_ENABLE
 		espconn_secure_set_default_certificate(default_certificate, default_certificate_len);
