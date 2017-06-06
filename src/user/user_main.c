@@ -3,9 +3,7 @@
 #include "gpio.h"
 #include "user_interface.h"
 #include "espconn.h"
-
 #include "rest_server.h"
-
 #include "driver/uart.h"
 
 void ICACHE_FLASH_ATTR  wifi_handle_event_cb(System_Event_t *evt) {
@@ -24,15 +22,24 @@ unsigned int counter = 0;
 static os_timer_t osRechargeCapTask_timer;
 void osRechargeCapTask(void *arg){
 
+	RESTEndpointADCCheckStatus();
+
 	os_printf("Discharge %d\r\n", counter);
 	ETS_GPIO_INTR_ENABLE();// Enable interrupts
 	GPIO_DIS_OUTPUT(14);
 	os_timer_disarm(&osRechargeCapTask_timer);
+	GPIO_DIS_OUTPUT(14);
+	wifi_fpm_set_sleep_type(LIGHT_SLEEP_T);
+	GPIO_DIS_OUTPUT(14);
+	wifi_set_sleep_type(LIGHT_SLEEP_T);
+	GPIO_DIS_OUTPUT(14);
 }
 
 void gpioInterruptTask(int * arg){
 
 	ETS_GPIO_INTR_DISABLE();// Enable interrupts
+	wifi_fpm_set_sleep_type(NONE_SLEEP_T);
+	wifi_set_sleep_type(NONE_SLEEP_T);
 
 	uint32 gpio_status = GPIO_REG_READ(GPIO_STATUS_ADDRESS);
 
@@ -86,8 +93,6 @@ void ICACHE_FLASH_ATTR  user_init(void) {
 	// Start listening for connections
 	RESTEndpointADCInit();
 	RESTServerInit();
-	
-	wifi_set_sleep_type(LIGHT_SLEEP_T);
 }
 
 uint32 ICACHE_FLASH_ATTR user_rf_cal_sector_set(void){

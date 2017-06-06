@@ -9,7 +9,8 @@
 				Interval:100,
 				Threshold:100,
 				Minimum:150,
-				Maximum:200
+				Maximum:200,
+				URL:'https://esp8266.valkenb.org/ping/'
 			}
 		}
 
@@ -35,7 +36,7 @@
 
 		var interval = setInterval(function(){
 			doRESTRequest();
-		},60000);
+		},5000);
 		doRESTRequest();
 		
 		
