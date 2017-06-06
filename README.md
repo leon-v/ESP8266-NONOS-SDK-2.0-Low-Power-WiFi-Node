@@ -1,5 +1,7 @@
 #Low power real time ESP8266 with REST interface.#
 
+## THIS PROJEST IS STILL COMING OUT OF PROOF-OF-CONCEPT AND IS NOT STABLE##
+
 
 ##The Environment:##
 So you understand this build environment, here is its description.
