@@ -1,9 +1,10 @@
-#Low power real time ESP8266 with REST interface.#
+#Low power real time ESP8266 with REST interface.
 
-## THIS PROJEST IS STILL COMING OUT OF PROOF-OF-CONCEPT AND IS NOT STABLE##
+## THIS PROJEST IS STILL COMING OUT OF PROOF-OF-CONCEPT AND IS NOT STABLE
+I will be keeping an eye on [this thread on EEVBLOG](http://www.eevblog.com/forum/projects/real-time-low-power-%2810mw%29-esp8266-expirments/) 
 
 
-##The Environment:##
+##The Environment:
 So you understand this build environment, here is its description.
 
 I am using Windows with the linux bash shell. crosstoon-NG is installed in /opt/Espresiif.
@@ -16,7 +17,7 @@ You may well need to edit gen_misc.sh to suit your device. I have an ESP12E usin
 There is a test REST script ESP_Test.html is an example of how to make a REST AJAX request from a browser.
 This is the script i use while doing the power analysis to give it some real world conditions.
 
-##The Software:##
+##The Software:
 This firmware will eventually be able to take and send REST requests when events are triggered.
 So far i have only thought about hot the ADC will be configured.
 
@@ -33,7 +34,7 @@ The 74HC4052 will run from a power circuit that will be switch on and off, and i
 The ESP8266 can make a hell of a lot of noise with its radio.
 
 
-##The Hardware.##
+##The Hardware.
 I am using an ESP12E soldered onto a DIP breakout which has requisite pull down/ups.
 
 The ESP8266 will go into Auto Light sleep, and needs to be woken via an external interrupt.
