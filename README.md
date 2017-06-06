@@ -7,7 +7,7 @@ I will be keeping an eye on [this thread on EEVBLOG](http://www.eevblog.com/foru
 #### The Environment:
 So you understand this build environment, here is its description.
 
-I am using Windows with the linux bash shell. crosstoon-NG is installed in /opt/Espresiif.
+I am using Windows with the Linux bash shell. crosstoon-NG is installed in /opt/Espresif.
 There is a script in /src/misc/getcompiler.sh to install dependencies and install required tools.
 
 I am editing with Sublime text 3 and have a build script to simply execute gen_misc.sh in the bash shell.
@@ -30,7 +30,7 @@ So far i have only thought about hot the ADC will be configured.
 	* Endpoint - The URL to the endpoint that this ADC will make a request to when firing an event.
 
 I might have some modes where there is no 74HC4052, maybe /adc/gpio or something.
-The 74HC4052 will run from a power circuit that will be switch on and off, and i will be trying to charge a large capacitor, and disconnecting the power source at a predictable time before taking a reading so there is a stable / low noise power source to the analog circuits.
+The 74HC4052 will run from a power circuit that will be switch on and off, and I will be trying to charge a large capacitor, and disconnecting the power source at a predictable time before taking a reading so there is a stable / low noise power source to the analog circuits.
 The ESP8266 can make a hell of a lot of noise with its radio.
 
 
