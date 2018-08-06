@@ -1,4 +1,4 @@
-# REST was a bad idea, It wa snot low power enough, and after playing with MQTT, i made the obvious choice.
+# REST was a bad idea, It was not low power enough, and after playing with MQTT, i made the obvious choice.
 New project: https://github.com/leon-v/MQTT-ESP8266-nRF24L01-Solar-Battery-I-O-Network
 
 ## Low power real time ESP8266 with REST interface.
